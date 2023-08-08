@@ -236,10 +236,10 @@ def compare_reagents():
             print(' ')
             print('Matching')
             print(' ')
-            l1 = tk.Button(my_w,text='Start\nUncapping',width=20,anchor='w',command=lambda:uncapping_time(),height=2)#after reagents are a match, continue to uncapping 
+            l1 = tk.Button(my_w,text='Start Uncapping',width=20,anchor='w',command=lambda:uncapping_time(),height=2)#after reagents are a match, continue to uncapping 
             l1.grid(row=4,column=0)
         else:
-            status = tk.Button(my_w,text='Not \nMatching',width=20,bg='red',height = 4) 
+            status = tk.Button(my_w,text='Not\nMatching',width=20,bg='red',height = 4) 
             status.grid(row=6,column=0,rowspan = 3)
             print(' ')
             print('NOT MATCHING')
@@ -398,7 +398,7 @@ my_w.title('Reagent Rack Terminal')
 my_w.geometry("500x450")  # Size of the window
 my_w.iconbitmap(r'Logo.ico') 
 #my_w.iconphoto(r"Logo.ico")
-b1 = tk.Button(my_w, text='Compare\nReagents',width=20,anchor='w',command= lambda:main(),height=2)#very simple UI 
+b1 = tk.Button(my_w, text='Compare Reagents',width=20,anchor='w',command= lambda:main(),height=2)#very simple UI 
 b1.grid(row=0,column=0,rowspan=2) 
 
 #b2 = tk.Button(my_w, text='Upload',width=10,anchor='w',command= lambda:upload_file())#very simple UI 
