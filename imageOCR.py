@@ -12,6 +12,7 @@ import csv
 import time
 from threading import *
 testingmode = False
+global status
 #rotate90 = False# not implemented
 
 #pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files (x86)\Tesseract-OCR\tesseract'
@@ -37,7 +38,7 @@ whitenumbers = [
 
 boundingboxes = [(35, 35, 131, 116, 0, 0), (175, 33, 137, 118, 0, 1), (329, 33, 133, 120, 0, 2), (488, 38, 127, 116, 0, 3), (32, 178, 129, 116, 1, 0), (177, 176, 130, 117, 1, 1), (332, 176, 131, 118, 1, 2), (485, 180, 127, 116, 1, 3), (32, 322, 118, 115, 2, 0), (181, 320, 120, 117, 2, 1), (330, 325, 131, 115, 2, 2), (486, 327, 129, 114, 2, 3), (32, 467, 115, 115, 3, 0), (177, 468, 131, 115, 3, 1), (331, 467, 137, 117, 3, 2), (484, 470, 129, 116, 3, 3), (32, 615, 120, 114, 4, 0), (177, 616, 133, 113, 4, 1), (331, 617, 129, 114, 4, 2), (485, 620, 130, 113, 4, 3), (32, 764, 129, 111, 5, 0), (181, 765, 135, 113, 5, 1), (334, 765, 127, 113, 5, 2), (486, 765, 130, 114, 5, 3)]
 
-doubleweight = ['H','h','S','5','E','w','m','2','W','3','4','0']
+doubleweight = ['H','h','S','5','E','w','m','2','W','3','4','O']
 finalnumbers = ['1','2','3','4','5','6','7','0','h',]#scuffed code haven't included H2O yet
 colorkey={'o':'orange','w':'white','r':'red','b':'gray30','p':'purple','g':'green','h':'gray70','y':'yellow','e':'gray60'}#b means blank, e means empty
 numberkey={'1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','9':'6','7':'7','0':'10','h':'H','b':' ','r':' ','g':' ','p':' ','y':' ','e':' ',' ':' '}
@@ -45,10 +46,12 @@ letkey = ['A','B','C','D']
 numkey = ['1','2','3','4','5','6']
 #snapy = [0, 150, 300, 450, 600, 750]#bbounding boxes snap to the 4x6 grid
 #snapx = [0, 150, 300, 450]#only for calibration
-calibratedcorners = [(714,476),
-(1282,464),
-(1242,1344),
-(670,1336),]#top left top right bottom right bottom left
+f = open('roi.txt', 'r')
+roi = f.read().split('\n')
+for i in range(4):
+    roi[i] = tuple(map(int,roi[i].split(' ')))
+f.close()
+#calibratedcorners = roi#[(714,476),(1282,464),(1242,1344),(670,1336)]#top left top right bottom right bottom left
 colorbound = [#all of this is in BGR,  lower upper threshold for color
 ((1,0.7,0),(1.2,0.9,0.8),'p'),#purple 64
 ((1.3,1.3,0),(2.5,2.5,10),'r'),#red 57
@@ -89,21 +92,24 @@ def ocr(cap,accuracy):
             charlist += char
     return charlist
 def uncapping_time():
+    global status
     status.destroy()
     for i in range(6):
         for j in range(4):
             tkimporttubes[i][j].destroy()
             if importtube[i][j][0] == 'b':
-                tkimporttubes[i][j] = tk.Button(my_w,text=' ',width=4,bg=colorkey['b'],height=2)  
+                tkimporttubes[i][j] = tk.Button(my_w,text=' ',width=4,bg=colorkey['b'],height=2)
+                importtube[i][j] = 'b'
             else:
                 tkimporttubes[i][j] = tk.Button(my_w,text=' ',width=4,bg=colorkey['e'],height=2)  
-                importtube[i][j] = ['e']
+                importtube[i][j] = 'e'
             tkimporttubes[i][j].grid(row=3-j+2,column=i+2)
     important = ()
     lasttube = [[[] for i in range(4)] for i in range(6)]
     lastimage = 0#to compare for motion
     #cv.imshow('frame', img)
     motionamount = 0
+    mistake = False
     while True:
         #time.sleep(0.2)
         #print (important)
@@ -121,19 +127,15 @@ def uncapping_time():
             frameDelta = cv.absdiff(lastimage, grayImage)
             thresh = cv.threshold(frameDelta, 25, 255, cv.THRESH_BINARY)[1]
             motionamount = cv.countNonZero(thresh)#/thresh.shape[0]/thresh.shape[1]
-            print (motionamount)
-            cv.imshow('frame', frameDelta)
+            #print (motionamount)
+
+            #cv.imshow('frame', frameDelta)
             
 
         lastimage = grayImage[:]
         #key = cv.waitKey(1) & 0xFF
         if cv.waitKey(1) == ord("q"):
             break
-
-                
-
-
-        
 
         if motionamount > 20:#make sure no one is inside machine
             time.sleep(0.3)
@@ -170,40 +172,57 @@ def uncapping_time():
                     else:
                         colorinfo[i][j] = 'c'#c for something else
             #print (tubeinfo,lasttube)
+            my_w.update()
+
+
+            for i in range(6):
+                for j in range(4):
+
+                    if colorinfo[i][j] == 'e' and lasttube[i][j] == 'b':#tube put back ini
+                        if important == (i,j):
+                            print (i,j, 'good tube put back into rack')
+                            good()
+                            mistake = False
+                        else:
+                            print (i,j, 'NOT GOOD MISTAKE MADE')
+                            mistake = True
+                            bad(i,3-j,important[0],3-important[1])
+                        buttonereplace(9-j+2,i+2,'e',i,j)
+                        my_w.update()
+                    elif colorinfo[i][j] == 'b' and lasttube[i][j] == 'e':
+                        buttonereplace(9-j+2,i+2,'b',i,j)
+                        my_w.update()
+
+
             for i in range(6):
                 for j in range(4):
 
                     if colorinfo[i][j] == 'b' and lasttube[i][j] == 'c' and tubeinfo[i][j] !=['b'] and tubeinfo[i][j] !=['e'] :#tube taken out of rack
+
                         print (i,j,'tube left rack')
                         important = (i,j)
-                        #tkcurrenttubes[i][j].destroy()
-                        tubeinfo[i][j] = ['b']
-                        #tkcurrenttubes[i][j] = tk.Button(my_w,width=2,bg=colorkey['b'])#pasting
-                        #tkcurrenttubes[i][j].grid(row=i+1,column=j+7)
-                        #buttonereplace(i+1,j+7,'b',i,j)
-                        t = Thread(target=buttonereplace(j+2,9-i+2,'b',i,j))
-                        t.start()
-                    elif colorinfo[i][j] == 'e' and lasttube[i][j] == 'b':#tube put back ini
-                        if important == (i,j):
-                            print (i,j, 'good tube put back into rack')
+                        #tubeinfo[i][j] = ['b']
+                        buttonereplace(9-j+2,i+2,'b',i,j)
+                        my_w.update()
 
-                            #buttonereplace(j+2,9-ii+2,'e',i,j)
-                           # tkcurrenttubes[i][j].destroy()
-                            #tkcurrenttubes[i][j] = tk.Button(my_w,width=2,bg=colorkey['e'])#pasting
-                            #tkcurrenttubes[i][j].grid(row=i+1,column=j+7)
 
-                        else:
-                            print (i,j, 'NOT GOOD MISTAKE MADE')
-                            #buttonereplace(j+2,9-ii+2,'e',i,j)
-                        t = Thread(target=buttonereplace(j+2,9-i+2,'e',i,j))
-                        t.start()
         lasttube = colorinfo[:]
+        if mistake == False:
+            if lasttube == importtube:
+                status = tk.Button(my_w,text='Reagents Are\nNow Ready',width=20,bg='green',height = 4) 
+                status.grid(row=6,column=0,rowspan = 3)
+                break
 
-    print (status)
-#def good():
-#    status.destroy()
-#    status = tk.Button(my_w,text='Lost Track\n Of Tubes',width=10,bg='red',height = 2) 
-#    status.grid(row=5,column=0,rowspan = 3)
+    #print (status)
+def good():
+    #status.destroy()
+    #print (status.winfo_exists())
+    status = tk.Button(my_w,text=f'Good So Far',width=20,bg='green',height = 4) 
+    status.grid(row=6,column=0,rowspan = 3)
+def bad(wrongx,wrongy,rightx,righty):
+    #status.destroy()
+    status = tk.Button(my_w,text=f'Lost Track Of Tubes\n Tube {numkey[wrongx]}{letkey[wrongy]} Is Supose\nTo Be At {numkey[rightx]}{letkey[righty]}',width=20,bg='red',height = 4) 
+    status.grid(row=6,column=0,rowspan = 3)
 def buttonereplace(y,x,bg,yind,xind):
     tkcurrenttubes[yind][xind].destroy()
     tkcurrenttubes[yind][xind] = tk.Button(my_w,width=4,bg=colorkey[bg],height=2)
@@ -211,13 +230,13 @@ def buttonereplace(y,x,bg,yind,xind):
 def compare_reagents():
     global status
     if tubeinfo != [] and importtube != []:
-        if tubeinfo == importtube or 1==1:
+        if tubeinfo == importtube:
             status = tk.Button(my_w,text='Matching',width=20,bg='green',height = 4) 
             status.grid(row=6,column=0,rowspan = 3)
             print(' ')
             print('Matching')
             print(' ')
-            l1 = tk.Button(my_w,text='Start',width=20,anchor='w',command=lambda:uncapping_time(),height=2)#after reagents are a match, continue to uncapping 
+            l1 = tk.Button(my_w,text='Start\nUncapping',width=20,anchor='w',command=lambda:uncapping_time(),height=2)#after reagents are a match, continue to uncapping 
             l1.grid(row=4,column=0)
         else:
             status = tk.Button(my_w,text='Not \nMatching',width=20,bg='red',height = 4) 
@@ -239,10 +258,11 @@ def error(message):
 
 
 def click_event(event, x, y, flags, params):
-    global currentpoint
+    global currentpoint,lastpoint
     if event == cv.EVENT_LBUTTONDOWN:
-        print(f'({x},{y})')
+        lastpoint = currentpoint
         currentpoint = (x,y)
+        print(x,y)
         
 
 def calibrate():
@@ -263,12 +283,13 @@ def calibrate():
     cv.namedWindow('Point Coordinates')
     cv.setMouseCallback('Point Coordinates', click_event)
     while True:
+        
         cv.imshow('Point Coordinates',img)
         if lastpoint != currentpoint:
-            print (lastpoint,currentpoint)
+            
             if lastpoint != ():
-                cv.line(img,lastpoint,currentpoint,(255,0,0),2)
-            lastpoint = currentpoint
+                img=cv.line(img,lastpoint,currentpoint,(255,0,0),2)
+            
             
         k = cv.waitKey(1) & 0xFF#esc ke
         if k == 27:
@@ -335,7 +356,7 @@ def upload_file():
     #print (df)
 
     
-def snapgrid(y,x):
+def snapgrid(y,x):#depeciated
     ysnap = 0
     xsnap = 0
     yclose = 10000
@@ -359,7 +380,8 @@ def warp(source):#warping to become rectangle
     #print ((source.shape[1], source.shape[0]), 'hi')
     #cv2_imshow(img1_color)
     try:
-        source_corners = np.array(calibratedcorners)
+    
+        source_corners = np.array(roi)
         target_corners = np.array([(10,10),(650,10),(650,910),(10,910)])
         H, _ = cv.findHomography(source_corners, target_corners, params=None)
         source = cv.warpPerspective(source, H, (source.shape[1], source.shape[0]))#warp cuz camera is not completely flat
@@ -376,7 +398,7 @@ my_w.title('Reagent Rack Terminal')
 my_w.geometry("500x450")  # Size of the window
 my_w.iconbitmap(r'Logo.ico') 
 #my_w.iconphoto(r"Logo.ico")
-b1 = tk.Button(my_w, text='Run',width=20,anchor='w',command= lambda:main(),height=2)#very simple UI 
+b1 = tk.Button(my_w, text='Compare\nReagents',width=20,anchor='w',command= lambda:main(),height=2)#very simple UI 
 b1.grid(row=0,column=0,rowspan=2) 
 
 #b2 = tk.Button(my_w, text='Upload',width=10,anchor='w',command= lambda:upload_file())#very simple UI 
@@ -567,7 +589,7 @@ def main():
                                             upper = np.array(100, dtype=np.uint8)
                                             mask = cv.inRange(tube, lower, upper)
                                             coloramount = (cv.countNonZero(mask))/area#img size is pointless but if ain't broke don't fix it
-                                            print (coloramount)
+                                            print (round(coloramount,3))
                                             if coloramount > 0.30:
                                                 tubeinfo[i][j].append('b')
                                             else:
@@ -648,7 +670,7 @@ def main():
                             tubeinfo[j][ii][0] = final
                             print (tubeinfo[j][ii][0], charlist)
                                 #break
-
+                                #code by Tony Wu
             l0 = tk.Label(my_w,text='Current')
             l0.grid(row=6,column=2,columnspan=6)
             l1 = tk.Label(my_w,text=' ') 
